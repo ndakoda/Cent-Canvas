@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cent Canvas</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script>
+      if (window.location.protocol === "file:") {
+        window.location.replace("http://localhost:8080/");
+      }
+    </script>
+    <script>
+      (() => {
+        if (window.Buffer) return;
+
+        const textEncoder = new TextEncoder();
+        const textDecoder = new TextDecoder();
+
+        class BrowserBuffer extends Uint8Array {
+          static from(value, encoding = "utf8") {
+            if (value instanceof ArrayBuffer) return new BrowserBuffer(value);
+            if (ArrayBuffer.isView(value)) return new BrowserBuffer(value.buffer, value.byteOffset, value.byteLength);
+            if (Array.isArray(value)) return new BrowserBuffer(value);
+            if (typeof value === "string") {
+              if (encoding === "hex") {
+                const clean = value.length % 2 ? `0${value}` : value;
+                return new BrowserBuffer(clean.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
+              }
+              if (encoding === "base64") {
+                return new BrowserBuffer([...atob(value)].map((char) => char.charCodeAt(0)));
+              }
+              return new BrowserBuffer(textEncoder.encode(value));
+            }
+            return new BrowserBuffer(value || 0);
+          }
+
+          static alloc(size, fill = 0) {
+            const buffer = new BrowserBuffer(size);
+            buffer.fill(fill);
+            return buffer;
+          }
+
+          static concat(list, totalLength = list.reduce((sum, item) => sum + item.length, 0)) {
+            const buffer = new BrowserBuffer(totalLength);
+            let offset = 0;
+            list.forEach((item) => {
+              buffer.set(item, offset);
+              offset += item.length;
+            });
+            return buffer;
+          }
+
+          static isBuffer(value) {
+            return value instanceof Uint8Array;
+          }
+
+          slice(start, end) {
+            return new BrowserBuffer(super.slice(start, end));
+          }
+
+          toString(encoding = "utf8") {
+            if (encoding === "hex") {
+              return [...this].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+            }
+            if (encoding === "base64") {
+              let binary = "";
+              for (let i = 0; i < this.length; i += 0x8000) {
+                binary += String.fromCharCode(...this.subarray(i, i + 0x8000));
+              }
+              return btoa(binary);
+            }
+            return textDecoder.decode(this);
+          }
+        }
+
+        window.Buffer = BrowserBuffer;
+      })();
+    </script>
+    <script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="canvas-stage" aria-label="Pixel canvas workspace">
+        <header class="topbar">
+          <a class="brand" href="./index.html" aria-label="Cent Canvas home">
+            <span class="brand-mark"></span>
+            <span>Cent Canvas</span>
+          </a>
+
+          <div class="stats" aria-label="Canvas stats">
+            <span><strong id="claimedCount">0</strong> claimed</span>
+            <span><strong id="volumeTotal">$0.00</strong> volume</span>
+            <span><strong id="zoomValue">100%</strong> zoom</span>
+          </div>
+
+          <button class="wallet" id="connectWallet" type="button">
+            <span class="wallet-dot" aria-hidden="true"></span>
+            <span id="walletId">Connect wallet</span>
+          </button>
+        </header>
+
+        <div class="canvas-wrap">
+          <canvas id="pixelCanvas" width="5000" height="3000" aria-label="Interactive pixel board"></canvas>
+          <div class="canvas-empty" id="emptyHint">
+            <strong>Pick a square.</strong>
+            <span>Claim it for $0.10 or take one over by paying double.</span>
+          </div>
+        </div>
+
+        <footer class="stage-footer">
+          <button class="icon-button" id="zoomOut" type="button" aria-label="Zoom out" title="Zoom out">-</button>
+          <input id="zoomSlider" type="range" min="40" max="220" value="100" aria-label="Zoom level" />
+          <button class="icon-button" id="zoomIn" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+          <button class="ghost-button" id="centerCanvas" type="button">Center</button>
+        </footer>
+      </section>
+
+      <aside class="control-panel" aria-label="Pixel purchase controls">
+        <div class="panel-header">
+          <p class="eyebrow">Live board</p>
+          <h1>Own a pixel. Lose it only when someone pays more.</h1>
+        </div>
+
+        <div class="wallet-card">
+          <div>
+            <span class="label">Wallet</span>
+            <strong id="walletAddress">Not connected</strong>
+          </div>
+          <span id="walletNetwork">Required to claim</span>
+        </div>
+
+        <div class="free-card" id="freeCard">
+          <div>
+            <span class="label">Launch pass</span>
+            <strong id="freeStatus">Connect wallet</strong>
+            <span id="freeDetail">First 50 wallets get 5 free first-claim pixels.</span>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Wallet</label>
+          <div class="wallet-grid" role="group" aria-label="Wallet">
+            <button type="button" class="wallet-choice is-active" data-wallet="phantom">Phantom</button>
+            <button type="button" class="wallet-choice" data-wallet="solflare">Solflare</button>
+            <button type="button" class="wallet-choice" data-wallet="metamask">MetaMask</button>
+            <button type="button" class="wallet-choice" data-wallet="trust">Trust</button>
+            <button type="button" class="wallet-choice" data-wallet="coinbase">Coinbase</button>
+            <button type="button" class="wallet-choice" data-wallet="rabby">Rabby</button>
+            <button type="button" class="wallet-choice" data-wallet="evm">Other EVM</button>
+          </div>
+        </div>
+
+        <div class="selected-card">
+          <div>
+            <span class="label">Selected</span>
+            <strong id="selectedPixel">None</strong>
+          </div>
+          <div class="pixel-preview" id="pixelPreview" aria-hidden="true"></div>
+        </div>
+
+        <div class="batch-card">
+          <div>
+            <span class="label">Batch</span>
+            <strong id="batchCount">0 pixels</strong>
+            <span id="batchTotal">$0.00 total</span>
+          </div>
+          <div class="batch-actions">
+            <button class="ghost-button" id="addToBatch" type="button" disabled>Add</button>
+            <button class="ghost-button" id="clearBatch" type="button" disabled>Clear</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="colorPicker">Pixel color</label>
+          <div class="color-row">
+            <input id="colorPicker" type="color" value="#1f8fff" />
+            <input id="hexColorInput" class="hex-input" type="text" value="#1f8fff" maxlength="7" spellcheck="false" aria-label="Hex color" />
+            <div class="swatches" aria-label="Color swatches">
+              <button type="button" class="swatch" style="--swatch: #1f8fff" data-color="#1f8fff" aria-label="Blue"></button>
+              <button type="button" class="swatch" style="--swatch: #19b27b" data-color="#19b27b" aria-label="Green"></button>
+              <button type="button" class="swatch" style="--swatch: #f6b13d" data-color="#f6b13d" aria-label="Gold"></button>
+              <button type="button" class="swatch" style="--swatch: #ef4f6f" data-color="#ef4f6f" aria-label="Rose"></button>
+              <button type="button" class="swatch" style="--swatch: #111827" data-color="#111827" aria-label="Ink"></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="handleInput">Public handle</label>
+          <input id="handleInput" type="text" maxlength="18" value="pixelist" autocomplete="off" />
+        </div>
+
+        <div class="field-group">
+          <label>Payment rail</label>
+          <div class="segmented" role="group" aria-label="Payment rail">
+            <button type="button" class="segment is-active" data-rail="Base">Base</button>
+            <button type="button" class="segment" data-rail="Solana">Solana</button>
+            <button type="button" class="segment" data-rail="Polygon">Polygon</button>
+          </div>
+        </div>
+
+        <div class="price-box">
+          <div>
+            <span class="label">Required payment</span>
+            <strong id="priceUsd">$0.10</strong>
+          </div>
+          <div class="price-meta">
+            <span id="priceCrypto">0.000003 ETH</span>
+            <span id="paymentDestination">Destination not set</span>
+          </div>
+        </div>
+
+        <dl class="owner-list">
+          <div>
+            <dt>Current owner</dt>
+            <dd id="currentOwner">Unclaimed</dd>
+          </div>
+          <div>
+            <dt>Last paid</dt>
+            <dd id="lastPaid">$0.00</dd>
+          </div>
+          <div>
+            <dt>Next rule</dt>
+            <dd>Double the last payment</dd>
+          </div>
+        </dl>
+
+        <div class="admin-panel" id="adminPanel" hidden>
+          <div>
+            <span class="label">Admin</span>
+            <strong>Owner controls enabled</strong>
+          </div>
+          <div class="admin-controls">
+            <div class="field-group">
+              <label for="adminOwnerInput">Display as</label>
+              <input id="adminOwnerInput" type="text" maxlength="18" value="featured" autocomplete="off" />
+            </div>
+            <div class="field-group">
+              <label for="adminAddressInput">Wallet/address label</label>
+              <input id="adminAddressInput" type="text" value="featured-wallet" autocomplete="off" />
+            </div>
+            <div class="field-group">
+              <label for="adminValueInput">Value per pixel</label>
+              <input id="adminValueInput" type="number" min="0" step="0.01" value="0.10" />
+            </div>
+            <label class="check-row">
+              <input id="adminCountsVolume" type="checkbox" checked />
+              <span>Count toward volume and leaderboard</span>
+            </label>
+            <label class="check-row">
+              <input id="adminDragPaint" type="checkbox" />
+              <span>Drag to add pixels to batch</span>
+            </label>
+            <div class="admin-actions">
+              <button class="ghost-button" id="turnOffAdmin" type="button">Turn off admin mode</button>
+              <button class="danger-button" id="clearBoard" type="button">Clear board</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="primary-button" id="claimButton" type="button" disabled>Choose a pixel</button>
+
+        <div class="activity">
+          <div class="activity-head">
+            <span>Recent claims</span>
+            <button type="button" id="seedBoard">Seed board</button>
+          </div>
+          <ol id="activityList" aria-live="polite"></ol>
+        </div>
+
+        <div class="activity leaderboard">
+          <div class="activity-head">
+            <span>Leaderboard</span>
+          </div>
+          <ol id="leaderboardList" aria-live="polite"></ol>
+        </div>
+      </aside>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

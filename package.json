@@ -1,0 +1,14 @@
+{
+  "name": "cent-canvas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A crypto pixel canvas with wallet payments, launch-pass free claims, and a backend admin panel.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check app.js && node --check admin.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

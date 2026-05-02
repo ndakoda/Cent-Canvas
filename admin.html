@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cent Canvas Admin</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="admin-shell">
+      <section class="admin-console">
+        <a class="brand" href="./index.html" aria-label="Back to Cent Canvas">
+          <span class="brand-mark"></span>
+          <span>Cent Canvas</span>
+        </a>
+
+        <div class="panel-header">
+          <p class="eyebrow">Owner console</p>
+          <h1>Admin access</h1>
+        </div>
+
+        <div class="wallet-card">
+          <div>
+            <span class="label">Admin session</span>
+            <strong id="adminWalletAddress">Not connected</strong>
+          </div>
+          <span id="adminWalletNetwork">Required</span>
+        </div>
+
+        <div class="field-group">
+          <label id="authTitle" for="adminPassword">Admin login</label>
+          <input id="adminPassword" type="password" autocomplete="off" placeholder="Backend admin password" />
+          <p class="field-note" id="authDescription">Enter the backend admin password to manage payment destinations.</p>
+        </div>
+
+        <button class="primary-button" id="adminAuthButton" type="button">Log in</button>
+
+        <div class="admin-panel" id="adminStatus" hidden>
+          <div>
+            <span class="label">Admin</span>
+            <strong id="adminStatusText">No admin session</strong>
+          </div>
+        </div>
+
+        <form class="payment-form" id="paymentForm" hidden>
+          <div class="field-group">
+            <label for="baseDestination">Base payment destination</label>
+            <input id="baseDestination" type="text" autocomplete="off" placeholder="0x..." />
+          </div>
+
+          <div class="field-group">
+            <label for="solanaDestination">Solana / Phantom payment destination</label>
+            <input id="solanaDestination" type="text" autocomplete="off" placeholder="Solana wallet address" />
+          </div>
+
+          <div class="field-group">
+            <label for="polygonDestination">Polygon payment destination</label>
+            <input id="polygonDestination" type="text" autocomplete="off" placeholder="0x..." />
+          </div>
+
+          <button class="primary-button" type="submit">Save payment destinations</button>
+        </form>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./admin.js"></script>
+  </body>
+</html>
